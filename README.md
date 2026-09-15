@@ -506,6 +506,8 @@ Base da plataforma e regras centrais.
 
 ### Fase 2 — Portal Web
 
+![Conceito visual do portal Web](docs/images/web-dashboard-preview.png)
+
 Interface administrativa para operação do BackOffice.
 
 Planejado:
@@ -523,6 +525,8 @@ Indicadores
 ```
 
 ### Fase 3 — Mobile
+
+![Conceito visual das aplicações Mobile](docs/images/mobile-app-preview.png)
 
 Aplicações móveis integradas à mesma API.
 
@@ -557,6 +561,8 @@ A tecnologia planejada para os aplicativos é **.NET MAUI**.
 ---
 
 ### Fase 4 — Cloud
+
+![Conceito visual da infraestrutura Azure](docs/images/azure-cloud-preview.png)
 
 Evolução da solução para infraestrutura em nuvem.
 
