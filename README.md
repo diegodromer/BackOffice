@@ -95,6 +95,8 @@ Visão final da plataforma:
 
 ## Funcionalidades atuais
 
+![Fluxo de requisição do BackOffice](docs/images/backend-request-flow.png)
+
 ### Solicitações
 
 A estrutura atual permite trabalhar com solicitações através das diferentes camadas do sistema.
