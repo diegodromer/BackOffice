@@ -1,0 +1,41 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Compilação .NET
+**/bin/
+**/obj/
+
+# Testes
+TestResults/
+*.trx
+
+# Cobertura de testes
+coverage/
+coverage.cobertura.xml
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.log
+
+# Sistema operacional
+Thumbs.db
+Desktop.ini
+
+relatórios/
+
+# Anotações locais
+comandos linha de execução.txt
+
+# Segredos e configurações locais futuras
+.env
+.env.*
+!.env.example
+**/appsettings.Local.json
+
+# Certificados e chaves privadas
+*.pfx
+*.p12
+*.key

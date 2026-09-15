@@ -1,0 +1,13 @@
+@BackOffice.Api_HostAddress = http://localhost:5275
+POST {{BackOffice.Api_HostAddress}}/api/ServiceRequests
+Content-Type: application/json
+
+{
+  "title": "Troca de monitor da secretaria",
+  "createdByUserId": "f83b2a97-63f3-4966-a950-a3f53e99c208"
+}
+
+###
+
+GET {{BackOffice.Api_HostAddress}}/api/ServiceRequests
+Accept: application/json

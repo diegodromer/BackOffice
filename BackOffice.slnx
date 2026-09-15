@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="src/BackOffice.Api/BackOffice.Api.csproj" Id="e78edad5-66af-4c06-8e21-afdacaff5fd4" />
+  <Project Path="src/BackOffice.Application/BackOffice.Application.csproj" />
+  <Project Path="src/BackOffice.Domain/BackOffice.Domain.csproj" />
+  <Project Path="src/BackOffice.Infrastructure/BackOffice.Infrastructure.csproj" Id="0c25cde6-8ff4-4d76-bf5e-50d3c59987bc" />
+  <Project Path="tests/BackOffice.Application.Tests/BackOffice.Application.Tests.csproj" Id="8817086c-c07d-493e-8fa9-a08549322d63" />
+  <Project Path="tests/BackOffice.Domain.Tests/BackOffice.Domain.Tests.csproj" Id="28492a9c-f6b4-475c-8a44-9782b6cfdd79" />
+  <Project Path="tests/BackOffice.Integration.Tests/BackOffice.Integration.Tests.csproj" Id="9ec0c593-edfa-40c2-81e8-187632cf0046" />
+</Solution>
