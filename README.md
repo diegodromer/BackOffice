@@ -3,9 +3,10 @@
 Sistema de back-office para gerenciamento de solicitações, usuários e fluxos de atendimento, desenvolvido em C#/.NET com
 arquitetura em camadas, persistência em SQL Server e testes automatizados.
 
-O projeto foi estruturado para evoluir de uma API backend para uma solução completa de atendimento, composta por portal
-web, aplicações mobile, autenticação e autorização, infraestrutura em nuvem e pipelines automatizados de integração e
-entrega.
+O backend atual possui autenticação JWT, autorização por perfil e operações de criação, listagem e consulta de solicitações
+por ID. A evolução planejada inclui portal web, aplicações mobile, infraestrutura em nuvem e pipelines de integração e entrega.
+
+**Marco validado em 24/10/2026:** 73 casos de teste aprovados.
 
 ---
 
@@ -64,32 +65,26 @@ Visão final da plataforma:
 
 ## Status do projeto
 
-| Área                           | Status                |
-| ------------------------------ | --------------------- |
-| Estrutura da solução           | ✅ Implementado       |
-| Domain                         | ✅ Implementado       |
-| Application                    | ✅ Implementado       |
-| Infrastructure                 | ✅ Implementado       |
-| ASP.NET Core Web API           | ✅ Implementado       |
-| SQL Server                     | ✅ Implementado       |
-| Entity Framework Core          | ✅ Implementado       |
-| Migrations                     | ✅ Implementado       |
-| Repository Pattern             | ✅ Implementado       |
-| Dependency Injection           | ✅ Implementado       |
-| Testes de domínio              | ✅ Implementado       |
-| Testes de aplicação            | ✅ Implementado       |
-| Testes de integração           | ✅ Implementado       |
-| Usuários e perfis              | ✅ Implementado       |
-| Hash de senha com PBKDF2       | ✅ Implementado       |
-| Fluxo de login na Application  | 🚧 Em desenvolvimento |
-| Autenticação HTTP              | 🚧 Em desenvolvimento |
-| JWT                            | 🗺️ Planejado          |
-| Autorização por perfil         | 🗺️ Planejado          |
-| Portal Web                     | 🗺️ Planejado          |
-| Aplicativo Mobile do atendente | 🗺️ Planejado          |
-| Aplicativo Mobile do cliente   | 🗺️ Planejado          |
-| Azure                          | 🗺️ Planejado          |
-| CI/CD                          | 🗺️ Planejado          |
+| Área | Status |
+| --- | --- |
+| Estrutura da solução e arquitetura em camadas | ✅ Implementadas |
+| Domain, Application e Infrastructure | ✅ Base implementada |
+| ASP.NET Core Web API | ✅ Implementada |
+| SQL Server, EF Core e migrations | ✅ Implementados |
+| Repository Pattern e Dependency Injection | ✅ Implementados |
+| Testes de domínio, aplicação, infraestrutura e integração | ✅ 73 casos aprovados |
+| Entidade de usuário e perfis | ✅ Implementados no domínio |
+| Hash de senha com PBKDF2 | ✅ Implementado |
+| Login na Application e endpoint HTTP | ✅ Implementados |
+| Geração e validação de JWT | ✅ Implementadas |
+| Permissões de criação e leitura de solicitações | ✅ Implementadas |
+| Consulta de detalhes por ID | ✅ Implementada |
+| Rotas centralizadas e arquivo HTTP com token | ✅ Implementados |
+| Expansão do atendimento e tratamento global de erros | 🗺️ Planejados |
+| Portal Web | 🗺️ Planejado |
+| Aplicativo .NET MAUI do atendente | 🗺️ Planejado |
+| Aplicativo .NET MAUI do cliente | 🗺️ Planejado |
+| Azure e CI/CD | 🗺️ Planejados |
 
 ---
 
@@ -121,18 +116,38 @@ Entity Framework Core
 SQL Server
 ```
 
-A API possui operações para criação e consulta de solicitações.
+A API possui operações protegidas por token Bearer para criação, listagem e consulta individual:
 
-```text
-POST /api/ServiceRequests
-GET  /api/ServiceRequests
-```
+| Método | Rota | Operação |
+| --- | --- | --- |
+| POST | `/api/ServiceRequests` | Criar uma solicitação |
+| GET | `/api/ServiceRequests` | Listar as solicitações permitidas ao usuário |
+| GET | `/api/ServiceRequests/{id}` | Consultar os detalhes de uma solicitação |
+
+As permissões são aplicadas na Application usando o ID e o perfil obtidos do token validado pela API:
+
+| Perfil | Criação | Listagem e detalhes |
+| --- | --- | --- |
+| `Admin` | Pode indicar um usuário existente como autor | Todas as solicitações |
+| `Attendant` | Pode indicar um usuário existente como autor | Todas as solicitações |
+| `Requester` | Somente em seu próprio nome | Somente suas próprias solicitações |
+
+A criação recebe `title` e `createdByUserId`. Para `Requester`, o ID informado precisa corresponder ao usuário autenticado.
+
+A consulta por ID retorna `200 OK` quando encontra uma solicitação permitida, `404 Not Found` quando o ID não existe
+e `403 Forbidden` quando um solicitante tenta consultar uma solicitação de outra pessoa.
+
+As rotas C# são centralizadas em `ApiRoutes`. O arquivo `BackOffice.Api.http` utiliza as variáveis de
+`http-client.env.json` e reaproveita o token do login e o ID devolvido pela criação.
+
+No ambiente local, execute os pedidos HTTP nesta ordem: login, criação e consultas. O arquivo também contém
+cenários de consulta sem token e consulta de ID inexistente.
 
 ---
 
 ### Usuários
 
-O domínio possui gerenciamento de usuários com informações como:
+O domínio possui uma entidade de usuário com informações como:
 
 ```text
 Id
@@ -156,79 +171,62 @@ As regras relacionadas aos usuários permanecem no domínio, sem dependência di
 
 ### Autenticação
 
-O fluxo de autenticação está sendo desenvolvido em etapas.
-
-Estrutura atual:
+O login HTTP e a geração de tokens JWT estão implementados.
 
 ```text
-LoginInput
+POST /api/Auth/login
     ↓
-LoginUseCase
+AuthController recebe LoginInput
     ↓
-IUserRepository.GetByEmail()
+LoginUseCase procura o usuário por e-mail
     ↓
-IPasswordHasher.Verify()
+IPasswordHasher.Verify() confere a senha
     ↓
-User
+LoginResult identifica o usuário e o perfil
     ↓
-LoginResult
+ITokenGenerator / JwtTokenGenerator gera o JWT
+    ↓
+Resposta com accessToken e expiresAt
 ```
 
-O sistema já possui:
+O endpoint recebe `email` e `password`. Quando as credenciais são válidas, retorna `200 OK` com os dados
+de identificação, o perfil, o token e sua expiração. O hash de senha não é incluído na resposta.
 
-```text
-LoginInput
-LoginResult
-LoginUseCase
-IPasswordHasher
-PasswordHasher
-PBKDF2
-salt aleatório
-comparação de hash em tempo constante
+Campos obrigatórios ausentes ou vazios recebem `400 Bad Request`. E-mail ou senha incorretos recebem
+`401 Unauthorized` com a mensagem genérica `E-mail ou senha inválidos.`.
+
+Para acessar as operações de solicitações, o cliente envia:
+
+```http
+Authorization: Bearer <accessToken>
 ```
-
-A próxima evolução desse fluxo inclui integração completa com a API, autenticação JWT e proteção dos endpoints.
 
 ---
 
 ## Segurança
 
-A arquitetura foi preparada para impedir que responsabilidades de segurança sejam espalhadas pelas diferentes camadas do
-sistema.
+O serviço `PasswordHasher` armazena a representação derivada da senha e verifica a senha informada no login.
 
-As senhas não devem ser armazenadas em texto puro.
-
-O serviço de hash utiliza:
+Parâmetros atuais:
 
 ```text
-PBKDF2
-SHA-256
-salt aleatório individual
-hash derivado
-comparação segura
+PBKDF2 com SHA-256
+100000 iterações
+salt aleatório de 16 bytes
+hash derivado de 32 bytes
+comparação com CryptographicOperations.FixedTimeEquals
 ```
 
-Fluxo planejado de autenticação:
+O JWT é assinado com HMAC-SHA256. A API valida a assinatura, o emissor, o destinatário e o prazo de validade
+antes de disponibilizar os dados do usuário autenticado aos controllers.
 
-```text
-E-mail + Senha
-      ↓
-AuthController
-      ↓
-LoginUseCase
-      ↓
-UserRepository
-      ↓
-PasswordHasher
-      ↓
-Validação das credenciais
-      ↓
-JWT
-      ↓
-Cliente autenticado
-```
+A configuração utiliza `JwtOptions`, com validação na inicialização. A chave de assinatura do ambiente local
+fica nos User Secrets da API. `Issuer`, `Audience` e `ExpirationMinutes` ficam na configuração da aplicação.
 
-Posteriormente os perfis de usuário serão utilizados para autorização dos recursos disponíveis na aplicação.
+Os endpoints de solicitações exigem autenticação. As decisões sobre autoria e visibilidade ficam nos casos de uso
+da Application, usando a identidade e o perfil extraídos do token validado.
+
+A referência a `System.Security.Cryptography.Pkcs` foi atualizada para `9.0.21` na Infrastructure.
 
 ---
 
@@ -237,20 +235,19 @@ Posteriormente os perfis de usuário serão utilizados para autorização dos re
 O BackOffice utiliza uma arquitetura em camadas, separando regras de negócio, casos de uso, infraestrutura e comunicação
 HTTP.
 
-```text
-BackOffice.Api
-        │
-        ▼
-BackOffice.Application
-        │
-        ▼
-BackOffice.Domain
+Dependências entre os projetos de produção:
 
-BackOffice.Infrastructure
-        │
-        ▼
-SQL Server
+```text
+BackOffice.Api            → BackOffice.Application
+BackOffice.Api            → BackOffice.Infrastructure
+BackOffice.Application    → BackOffice.Domain
+BackOffice.Infrastructure → BackOffice.Application + BackOffice.Domain
+BackOffice.Domain         → sem referências a outros projetos
 ```
+
+A Application utiliza interfaces. A Infrastructure implementa os repositórios e os serviços técnicos,
+e a API configura essas implementações na injeção de dependência. Os fluxos ilustrados neste documento
+representam a execução das operações; as referências entre projetos seguem a relação acima.
 
 ### BackOffice.Domain
 
@@ -296,10 +293,12 @@ Exemplos:
 ```text
 CreateServiceRequestUseCase
 ListServiceRequestsUseCase
+GetServiceRequestByIdUseCase
 LoginUseCase
 IUserRepository
 IServiceRequestRepository
 IPasswordHasher
+ITokenGenerator
 ```
 
 ---
@@ -318,6 +317,8 @@ Repositories
 Migrations
 Database Seeder
 PasswordHasher
+JwtTokenGenerator
+JwtOptions
 Serviços técnicos
 ```
 
@@ -330,9 +331,12 @@ Responsável pela exposição HTTP da aplicação.
 Contém:
 
 ```text
-Controllers
+AuthController
+ServiceRequestsController
+Rotas centralizadas em ApiRoutes
 Dependency Injection
 Configuração da aplicação
+Autenticação e autorização HTTP
 Endpoints HTTP
 Respostas da API
 ```
@@ -360,6 +364,7 @@ BackOffice
 │   │
 │   ├── BackOffice.Application.Tests
 │   ├── BackOffice.Domain.Tests
+│   ├── BackOffice.Infrastructure.Tests
 │   └── BackOffice.Integration.Tests
 │
 ├── BackOffice.slnx
@@ -403,31 +408,33 @@ __EFMigrationsHistory
 
 ## Testes automatizados
 
-O projeto possui atualmente **48 testes automatizados**.
+O último marco validado possui **73 casos de teste aprovados**:
 
-A estratégia de testes é dividida em diferentes níveis:
+| Projeto | Casos | Cobertura principal |
+| --- | ---: | --- |
+| `BackOffice.Domain.Tests` | 36 | Entidades, validações e regras do atendimento |
+| `BackOffice.Application.Tests` | 19 | Login, criação, listagem, consulta por ID e permissões |
+| `BackOffice.Infrastructure.Tests` | 9 | Hash e verificação de senhas |
+| `BackOffice.Integration.Tests` | 9 | Login HTTP, criação e listagem, autenticação e assinatura do token |
+| **Total** | **73** | |
+
+Um método com `[Theory]` pode executar vários casos por meio de `[InlineData]`. O total acima contabiliza
+essas execuções, além dos testes com `[Fact]`.
+
+A estratégia de testes é dividida em quatro níveis:
 
 ```text
-Domain Tests
-     ↓
-Regras de negócio isoladas
-
-Application Tests
-     ↓
-Casos de uso e contratos
-
-Integration Tests
-     ↓
-HTTP
-Controllers
-Dependency Injection
-Application
-Domain
-Infrastructure
-Entity Framework Core
+Domain Tests         → regras de negócio isoladas
+Application Tests    → casos de uso e permissões com repositórios falsos
+Infrastructure Tests → implementação real do serviço de senha
+Integration Tests    → HTTP, controllers, DI, Application, Domain e EF Core/SQL Server
 ```
 
-O objetivo é garantir que alterações futuras possam ser realizadas com maior segurança e menor risco de regressão.
+Os testes de integração utilizam a configuração local e o banco SQL Server.
+As novas rotas de detalhes também foram verificadas manualmente pelo arquivo `.http`, incluindo
+resposta de sucesso, ID inexistente e ausência de token.
+
+O objetivo é verificar as regras e os contratos entre as camadas e detectar regressões.
 
 ---
 
@@ -439,6 +446,8 @@ O objetivo é garantir que alterações futuras possam ser realizadas com maior 
 C#
 .NET 10
 ASP.NET Core Web API
+JWT Bearer
+PBKDF2 / SHA-256
 Entity Framework Core
 SQL Server
 ```
@@ -447,8 +456,9 @@ SQL Server
 
 ```text
 xUnit
-Testes unitários
+Testes de domínio
 Testes de aplicação
+Testes de infraestrutura
 Testes de integração
 ```
 
@@ -462,7 +472,7 @@ GitHub
 ### Planejado
 
 ```text
-JWT
+Portal Web
 .NET MAUI
 Azure
 GitHub Actions
@@ -473,7 +483,7 @@ CI/CD
 
 ## Roadmap
 
-### Fase 1 — Backend
+### V1 — Base do backend
 
 Base da plataforma e regras centrais.
 
@@ -495,16 +505,19 @@ Base da plataforma e regras centrais.
 ✅ PasswordHash
 ✅ PBKDF2
 ✅ LoginUseCase
-🚧 Integração completa do serviço de senha
-🚧 Endpoint de autenticação
-🗺️ JWT
-🗺️ Autorização
-🗺️ Proteção de endpoints
+✅ Serviço de senha integrado ao login e ao seeder
+✅ Endpoint de autenticação
+✅ Geração e validação de JWT
+✅ Permissões de criação e leitura por perfil
+✅ Proteção dos endpoints de solicitações
+✅ Consulta de detalhes por ID
+✅ Rotas centralizadas e requisições HTTP com token
+✅ 73 casos de teste aprovados
 🗺️ Tratamento global de erros
 🗺️ Expansão das funcionalidades de atendimento
 ```
 
-### Fase 2 — Portal Web
+### Fase 1 — Portal Web
 
 ![Conceito visual do portal Web](docs/images/web-dashboard-preview.png)
 
@@ -524,13 +537,13 @@ Controle por perfil
 Indicadores
 ```
 
-### Fase 3 — Mobile
+### Fase 2 e Fase 2B — Mobile
 
 ![Conceito visual das aplicações Mobile](docs/images/mobile-app-preview.png)
 
 Aplicações móveis integradas à mesma API.
 
-#### Aplicativo do atendente
+#### Fase 2 — Aplicativo do atendente
 
 Planejado:
 
@@ -543,7 +556,7 @@ Notificações
 Histórico
 ```
 
-#### Aplicativo do cliente
+#### Fase 2B — Aplicativo do cliente
 
 Planejado:
 
@@ -560,7 +573,7 @@ A tecnologia planejada para os aplicativos é **.NET MAUI**.
 
 ---
 
-### Fase 4 — Cloud
+### Fase 3 — Cloud
 
 ![Conceito visual da infraestrutura Azure](docs/images/azure-cloud-preview.png)
 
@@ -582,7 +595,7 @@ Backup
 
 ---
 
-### Fase 5 — CI/CD
+### Fase 4 / contínua — CI/CD
 
 Automação do ciclo de desenvolvimento e publicação.
 
