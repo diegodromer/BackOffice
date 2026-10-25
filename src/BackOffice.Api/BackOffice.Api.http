@@ -1,6 +1,20 @@
-@BackOffice.Api_HostAddress = http://localhost:5275
-POST {{BackOffice.Api_HostAddress}}/api/ServiceRequests
+# 1. Fazer login e receber o token
+#@name login
+POST {{HostAddress}}{{LoginRoute}}
 Content-Type: application/json
+
+{
+  "email": "diego.dromer@estudoscsharpe.com",
+  "password": "Senha123!"
+}
+
+###
+
+# 2. Criar uma solicitação usando o token do login
+# @name createServiceRequest
+POST {{HostAddress}}{{ServiceRequestsRoute}}
+Content-Type: application/json
+Authorization: Bearer {{LoginRoute.response.body.$.accessToken}}
 
 {
   "title": "Troca de monitor da secretaria",
@@ -9,5 +23,33 @@ Content-Type: application/json
 
 ###
 
-GET {{BackOffice.Api_HostAddress}}/api/ServiceRequests
+# 3. Listar solicitações sem token
+GET {{HostAddress}}{{ServiceRequestsRoute}}
+Accept: application/json
+
+###
+
+# 4. Listar solicitãções usando o token do login
+GET {{HostAddress}}{{ServiceRequestsRoute}}
+Accept: application/json
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+###
+
+# 5. Consultar os detalhes da solicitação criada
+GET {{HostAddress}}{{ServiceRequestsRoute}}/{{createServiceRequest.response.body.$.id}}
+Accept: application/json
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+###
+
+# 6. Consultar uma solicitação com ID inexistente
+GET {{HostAddress}}{{ServiceRequestsRoute}}/00000000-0000-0000-0000-000000000000
+Accept: application/json
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+###
+
+# 7. Consultar os detalhes sem token
+GET {{HostAddress}}{{ServiceRequestsRoute}}/{{createServiceRequest.response.body.$.id}}
 Accept: application/json

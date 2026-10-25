@@ -2,11 +2,65 @@
 using BackOffice.Application.Interfaces;
 using BackOffice.Application.UseCases;
 using BackOffice.Domain.Entities;
+using BackOffice.Domain.Enums;
 
 namespace BackOffice.Application.Tests {
     public class CreateServiceRequestUseCaseTests {
-        [Fact]
-        public void Execute_WhenUserExists_ShouldCreateAndSaveServiceRequest() {
+
+        private class FakeUserRepository : IUserRepository {
+            private readonly User? user;
+
+            public FakeUserRepository(User? user) {
+                this.user = user;
+            }
+
+            public User? GetByEmail(string email) {
+                return null;
+            }
+
+            public User? GetById(Guid userId) {
+                if (user is null || user.Id != userId) {
+                    return null;
+                }
+                return user;
+            }
+        }
+        private class FakeServiceRequestRepository : IServiceRequestRepository {
+            private readonly List<ServiceRequest> serviceRequests;
+
+            public ServiceRequest? AddedServiceRequest { get; private set; }
+
+            public FakeServiceRequestRepository() {
+                serviceRequests = new List<ServiceRequest>();
+            }
+
+            public void Add(ServiceRequest serviceRequest) {
+                AddedServiceRequest = serviceRequest;
+                serviceRequests.Add(serviceRequest);
+            }
+
+            public IReadOnlyList<ServiceRequest> GetAll() {
+                return serviceRequests.AsReadOnly();
+            }
+
+            public IReadOnlyList<ServiceRequest> GetByCreatedByUserId(Guid userId) {
+                return serviceRequests
+                    .Where(serviceRequest => serviceRequest.CreatedBy.Id == userId)
+                    .ToList();
+            }
+
+            public ServiceRequest? GetById(Guid serviceRequestId) {
+                return serviceRequests.FirstOrDefault(
+                    ServiceRequest => ServiceRequest.Id == serviceRequestId
+                );
+            }
+        }
+
+        [Theory]
+        [InlineData(UserRole.Admin)]
+        [InlineData(UserRole.Attendant)]
+        [InlineData(UserRole.Requester)]
+        public void Execute_WhenUserExists_ShouldCreateAndSaveServiceRequest(UserRole userRole) {
             User createdBy = new User(
                 "Diego",
                 "diego.dromer@estudoscsharpe.com"
@@ -20,7 +74,11 @@ namespace BackOffice.Application.Tests {
 
             CreateServiceRequestInput input = new CreateServiceRequestInput(" Solicitação de teste", createdBy.Id);
 
-            ServiceRequest serviceRequest = useCase.Execute(input);
+            ServiceRequest serviceRequest = useCase.Execute(
+                input, 
+                createdBy.Id, 
+                userRole
+            );
 
             Assert.Equal("Solicitação de teste", serviceRequest.Title);
             Assert.Same(createdBy, serviceRequest.CreatedBy);
@@ -47,48 +105,42 @@ namespace BackOffice.Application.Tests {
             );
 
             InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
-                () => useCase.Execute(input)
+                () => useCase.Execute(input, Guid.NewGuid(), UserRole.Admin)
             );
 
             Assert.Null(serviceRequestRepository.AddedServiceRequest);
         }
 
-        private class FakeUserRepository : IUserRepository {
-            private readonly User? user;
+        [Fact]
+        public void Execute_WhenRequesterCreatesForAnotherUser_ShouldThrowUnauthorizedAccessException() {
+            User requester = new User(
+                "Diego",
+                "diego.dromer@estudoscsharpe.com"
+            );
 
-            public FakeUserRepository(User? user) {
-                this.user = user;
-            }
+            User otherUser = new User(
+                "Ana",
+                "ana@backoffice.loca"
+            );
 
-            public User? GetByEmail(string email) {
-                return null;
-            }
+            FakeUserRepository userRepository = new FakeUserRepository(otherUser);
+            FakeServiceRequestRepository serviceRequestRepository = new FakeServiceRequestRepository();
 
-            public User? GetById(Guid userId) {
-                if (user is null || user.Id != userId) {
-                    return null;
-                }
-                return user;
-            }
+            CreateServiceRequestUseCase useCase = new CreateServiceRequestUseCase(userRepository, serviceRequestRepository);
+
+            CreateServiceRequestInput input = new CreateServiceRequestInput("Solicitação em nome de outra pessoa", otherUser.Id);
+
+            Assert.Throws<UnauthorizedAccessException>(
+                () => useCase.Execute(
+                    input,
+                    requester.Id,
+                    UserRole.Requester
+                )
+            );
+
+            Assert.Null(serviceRequestRepository.AddedServiceRequest);
         }
 
-        private class FakeServiceRequestRepository : IServiceRequestRepository {
-            private readonly List<ServiceRequest> serviceRequests;
-            
-            public ServiceRequest? AddedServiceRequest { get; private set; }
 
-            public FakeServiceRequestRepository() {
-                serviceRequests = new List<ServiceRequest>();
-            }
-
-            public void Add(ServiceRequest serviceRequest) {
-                AddedServiceRequest = serviceRequest;
-                serviceRequests.Add(serviceRequest);
-            }
-
-            public IReadOnlyList<ServiceRequest> GetAll() {
-                return serviceRequests.AsReadOnly();
-            }
-        }
     }
 }

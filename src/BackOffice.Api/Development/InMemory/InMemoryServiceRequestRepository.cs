@@ -18,5 +18,17 @@ namespace BackOffice.Api.Development.InMemory {
         public IReadOnlyList<ServiceRequest> GetAll() {
             return serviceRequests.AsReadOnly();
         }
+
+        public IReadOnlyList<ServiceRequest> GetByCreatedByUserId(Guid userId) {
+            return serviceRequests
+                .Where(serviceRequest => serviceRequest.CreatedBy.Id == userId)
+                .ToList();
+        }
+
+        public ServiceRequest? GetById(Guid serviceRequestId) {
+            return serviceRequests.FirstOrDefault(
+                ServiceRequest => ServiceRequest.Id == serviceRequestId
+            );
+        }
     }
 }

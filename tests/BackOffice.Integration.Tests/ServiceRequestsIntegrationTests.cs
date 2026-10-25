@@ -1,13 +1,18 @@
 ﻿using BackOffice.Api;
+using BackOffice.Api.Routing;
+using BackOffice.Application.Interfaces;
 using BackOffice.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography.Xml;
 using System.Text.Json;
 
 namespace BackOffice.Integration.Tests {
     public class ServiceRequestsIntegrationTests : IClassFixture<WebApplicationFactory<Program>> {
+        private const string serviceRequestsRoute = "/" + ApiRoutes.ServiceRequests;
         private readonly WebApplicationFactory<Program> factory;
 
         public ServiceRequestsIntegrationTests(
@@ -21,10 +26,42 @@ namespace BackOffice.Integration.Tests {
 
             BackOfficeDbContext dbContext = scope.ServiceProvider.GetRequiredService<BackOfficeDbContext>();
 
-            var developmentUser = BackOfficeDatabaseSeeder.SeedDevelopmentUser(dbContext);
+            IPasswordHasher passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+            var developmentUser = BackOfficeDatabaseSeeder.SeedDevelopmentUser(dbContext, passwordHasher);
 
             return developmentUser.Id;
         }
+
+        private async Task<HttpClient> CreateAuthenticatedClientAsync() {
+            HttpClient client = factory.CreateClient();
+
+            var input = new {
+                email = "diego.dromer@estudoscsharpe.com",
+                password = "Senha123!"
+            };
+
+            using HttpResponseMessage response = await client.PostAsJsonAsync(
+                ApiRoutes.AuthLogin,
+                input
+            );
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            string responseBody = await response.Content.ReadAsStringAsync();
+            using JsonDocument json = JsonDocument.Parse( responseBody );
+
+            string accessToken = json.RootElement
+                .GetProperty("accessToken")
+                .GetString()!;
+
+            Assert.False(string.IsNullOrWhiteSpace(accessToken));
+
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            return client;
+        }
+
         
         [Fact]
         public async Task Post_WhenInputIsValid_ShouldReturnCreated() {
@@ -36,11 +73,11 @@ namespace BackOffice.Integration.Tests {
                 createdByUserId = developmentUserId
             };
 
-            HttpClient client = factory.CreateClient();
+            HttpClient client = await CreateAuthenticatedClientAsync();
 
             HttpResponseMessage response = 
                 await client.PostAsJsonAsync(
-                    "/api/ServiceRequests",
+                    serviceRequestsRoute,
                     input
                 );
 
@@ -81,10 +118,10 @@ namespace BackOffice.Integration.Tests {
                 createdByUserId = Guid.NewGuid(),
             };
 
-            HttpClient client = factory.CreateClient();
+            HttpClient client = await CreateAuthenticatedClientAsync();
 
             HttpResponseMessage response = await client.PostAsJsonAsync(
-                "/api/ServiceRequests",
+                serviceRequestsRoute,
                 input
             );
 
@@ -112,9 +149,8 @@ namespace BackOffice.Integration.Tests {
                 createdByUserId = developmentUserId
             };
 
-            HttpClient client = factory.CreateClient();
-
-            HttpResponseMessage response = await client.PostAsJsonAsync("/api/ServiceRequests", input);
+            HttpClient client = await CreateAuthenticatedClientAsync();
+            HttpResponseMessage response = await client.PostAsJsonAsync(serviceRequestsRoute, input);
 
             string responseBody = await response.Content.ReadAsStringAsync();
 
@@ -134,9 +170,8 @@ namespace BackOffice.Integration.Tests {
         }
 
         [Fact]
-        public async Task Get_WhenRequestsExist_ShouldReturnOkAndCreatedRequests() { 
-            HttpClient client = factory.CreateClient();
-
+        public async Task Get_WhenRequestsExist_ShouldReturnOkAndCreatedRequests() {
+            HttpClient client = await CreateAuthenticatedClientAsync();
             Guid createdByUserId = GetDevelopmentUserId();
 
             string uniquePart = Guid.NewGuid().ToString("N");
@@ -146,7 +181,7 @@ namespace BackOffice.Integration.Tests {
             string secondTitle = $"Solicitação GET teste {uniquePart} B";
 
             HttpResponseMessage firstPostResponse = await client.PostAsJsonAsync(
-                "/api/ServiceRequests",
+                serviceRequestsRoute,
                 new {
                     title = firstTitle,
                     createdByUserId
@@ -154,7 +189,7 @@ namespace BackOffice.Integration.Tests {
             );
 
             HttpResponseMessage secondPostResponse = await client.PostAsJsonAsync(
-                "/api/ServiceRequests",
+                serviceRequestsRoute,
                 new {
                     title = secondTitle,
                     createdByUserId
@@ -164,7 +199,7 @@ namespace BackOffice.Integration.Tests {
             Assert.Equal(HttpStatusCode.Created, firstPostResponse.StatusCode);
             Assert.Equal(HttpStatusCode.Created, secondPostResponse.StatusCode);
 
-            HttpResponseMessage response = await client.GetAsync("/api/ServiceRequests");
+            HttpResponseMessage response = await client.GetAsync(serviceRequestsRoute);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -184,6 +219,45 @@ namespace BackOffice.Integration.Tests {
                 serviceRequests.EnumerateArray(),
                 serviceRequests => serviceRequests.GetProperty("title").GetString() == secondTitle
             );
-        }    
+        }
+
+        [Fact]
+        public async Task Get_WhenTokenIsMissing_ShouldReturnUnauthorized() {            
+            using HttpClient client = factory.CreateClient();
+            using HttpResponseMessage response = await client.GetAsync(serviceRequestsRoute);
+
+            Assert.Equal(
+                HttpStatusCode.Unauthorized,
+                response.StatusCode
+            );
+        }
+
+        [Fact]
+        public async Task Get_WhenTokenSignatureIsTampered_ShouldReturnUnauthorized() {
+            using HttpClient client = await CreateAuthenticatedClientAsync();
+
+            string accessToken = client.DefaultRequestHeaders.Authorization!.Parameter!;
+            string[] tokenParts = accessToken.Split( '.' );
+            char[] signature = tokenParts[2].ToCharArray();
+
+            if (signature[0] == 'A') {
+                signature[0] = 'B';
+            } else {
+                signature[0] = 'A';
+            }
+
+            tokenParts[2] = new string(signature);
+
+            string tamperedToken = string.Join(".", tokenParts );
+
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tamperedToken);
+
+            using HttpResponseMessage response = await client.GetAsync(serviceRequestsRoute);
+
+            Assert.Equal(
+                HttpStatusCode.Unauthorized, 
+                response.StatusCode
+            );
+        }
     }
 }

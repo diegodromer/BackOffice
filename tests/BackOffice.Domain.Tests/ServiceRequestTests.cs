@@ -117,7 +117,7 @@ namespace BackOffice.Domain.Tests {
         [Fact]
         public void Create_WithNullCreatedBy_ShouldThrowArgumentNullException() {
             Assert.Throws<ArgumentNullException>(() => {
-                new ServiceRequest("Impressora sem toner", null);
+                new ServiceRequest("Impressora sem toner", null!);
             });
         }
 
@@ -143,7 +143,7 @@ namespace BackOffice.Domain.Tests {
             );
 
             Assert.Throws<ArgumentNullException>(() => {
-                request.AssignTo(null);
+                request.AssignTo(null!);
             });
         }
 

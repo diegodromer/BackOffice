@@ -5,5 +5,11 @@ namespace BackOffice.Application.Interfaces {
         void Add(ServiceRequest serviceRequest);
         
         IReadOnlyList<ServiceRequest> GetAll();
+
+        IReadOnlyList<ServiceRequest> GetByCreatedByUserId(Guid userId);
+
+        ServiceRequest? GetById(Guid serviceRequestId);
+
+
     }
 }

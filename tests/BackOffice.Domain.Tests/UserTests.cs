@@ -38,14 +38,14 @@ namespace BackOffice.Domain.Tests {
         [Fact]
         public void CreateUser_WithNullName_ShouldThrowArgumentNullException() {
             Assert.Throws<ArgumentNullException>( () => {
-                new User(null, "diego.estudoscsharpe.com");
+                new User(null!, "diego.estudoscsharpe.com");
             });
         }
 
         [Fact]
         public void CreateUser_WithNullEmail_ShouldThrowArgumentNullException() {
             Assert.Throws<ArgumentNullException>(() => {
-                new User("Diego Lima", null);
+                new User("Diego Lima", null!);
             });
         }
 

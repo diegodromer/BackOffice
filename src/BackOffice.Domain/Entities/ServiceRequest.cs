@@ -20,8 +20,8 @@ namespace BackOffice.Domain.Entities {
         public string? ReopeningReason {  get; private set; }
 
         private ServiceRequest() {
-            Title = null;
-            CreatedBy = null;
+            Title = string.Empty;
+            CreatedBy = null!;
         }
 
         public ServiceRequest(string title, User createdBy) {

@@ -27,5 +27,20 @@ namespace BackOffice.Infrastructure.Repositories {
                 .Include(serviceRequest => serviceRequest.AssignedTo)
                 .ToList();
         }
+
+        public IReadOnlyList<ServiceRequest> GetByCreatedByUserId(Guid userId) {
+            return dbContext.ServiceRequests
+                .Where(serviceRequest => serviceRequest.CreatedBy.Id == userId)
+                .Include(serviceRequest => serviceRequest.CreatedBy)
+                .Include(serviceRequest => serviceRequest.AssignedTo)
+                .ToList();
+        }
+
+        public ServiceRequest? GetById(Guid serviceRequestId) {
+            return dbContext.ServiceRequests
+                .Include(serviceRequest => serviceRequest.CreatedBy)
+                .Include(serviceRequest => serviceRequest.AssignedTo)
+                .FirstOrDefault(serviceRequest => serviceRequest.Id == serviceRequestId);
+        }
     }
 }
